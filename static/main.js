@@ -16,7 +16,7 @@ document.getElementById('upload-form').addEventListener('submit', function(e) {
   })
   .then(response => response.json())
   .then(data => {
-    if (data.libraries) {
+    if (data.libraries && data.libraries.length > 0) {
       displayLibraries(data.libraries);
     } else {
       alert("No dependencies found.");
@@ -41,6 +41,7 @@ function displayLibraries(libraries) {
     const label = document.createElement('label');
     label.textContent = lib;
     const div = document.createElement('div');
+    div.className = "checkbox-item";
     div.appendChild(checkbox);
     div.appendChild(label);
     listDiv.appendChild(div);
@@ -68,57 +69,66 @@ document.getElementById('libraries-form').addEventListener('submit', function(e)
     alert("Please enter both SERPAPI and Gemini API keys.");
     return;
   }
-  // Process each library sequentially
   fetchDocumentation(selectedLibraries, serpapiKey, geminiKey, outputOption);
 });
 
 async function fetchDocumentation(libraries, serpapiKey, geminiKey, outputOption) {
   const results = {};
   for (let lib of libraries) {
-    // Step 1: Use SERPAPI to search for the official documentation
-    const searchQuery = encodeURIComponent(lib + " official documentation");
-    const serpapiURL = `https://serpapi.com/search?engine=google&q=${searchQuery}&api_key=${serpapiKey}`;
-    let serpapiResponse = await fetch(serpapiURL);
-    let serpapiData = await serpapiResponse.json();
-    // For simplicity, choose the first organic result
-    let candidateURL = "";
-    if (serpapiData && serpapiData.organic_results && serpapiData.organic_results.length > 0) {
-      candidateURL = serpapiData.organic_results[0].link;
-    } else {
-      candidateURL = "";
+    console.log("Processing library:", lib);
+    try {
+      // Step 1: Use SERPAPI to search for the official documentation
+      const searchQuery = encodeURIComponent(lib + " official documentation");
+      const serpapiURL = `https://serpapi.com/search?engine=google&q=${searchQuery}&api_key=${serpapiKey}`;
+      let serpapiResponse = await fetch(serpapiURL);
+      let serpapiData = await serpapiResponse.json();
+      if (!serpapiData || !serpapiData.organic_results || serpapiData.organic_results.length === 0) {
+        console.error("No SERPAPI results for", lib);
+        results[lib] = ["No documentation found via SERPAPI."];
+        continue;
+      }
+      
+      // Step 2: Pass all organic results to Gemini to select the best URL
+      const geminiPrompt = {
+        "model": "gemini-2.0-flash-exp",
+        "contents": `Given the following SERPAPI results for library "${lib}": ${JSON.stringify(serpapiData.organic_results)}. Select the most official and stable documentation URL. Only return the URL.`
+      };
+      let geminiURL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+      let geminiResponse = await fetch(geminiURL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(geminiPrompt)
+      });
+      let geminiData = await geminiResponse.json();
+      let chosenURL = "";
+      if (geminiData && geminiData.candidates && geminiData.candidates.length > 0) {
+        chosenURL = geminiData.candidates[0].output.trim();
+      }
+      if (!chosenURL) {
+        console.error("Gemini did not return a valid URL for", lib);
+        results[lib] = ["No valid documentation URL returned by Gemini."];
+        continue;
+      }
+      console.log("Chosen URL for", lib, ":", chosenURL);
+      
+      // Step 3: Fetch the documentation page content (using a free CORS proxy)
+      const proxyURL = "https://api.allorigins.hexocode.repl.co/get?disableCache=true&url=" + encodeURIComponent(chosenURL);
+      let pageResponse = await fetch(proxyURL);
+      let pageData = await pageResponse.json();
+      let htmlContent = pageData.contents;
+      
+      // Step 4: Convert HTML content to plain text, preserving headers and code blocks
+      let plainText = parseHTMLToPlainText(htmlContent);
+      
+      // Step 5: Split text if it exceeds ~30k tokens (approximated by word count)
+      let splitTexts = splitText(plainText, 30000);
+      results[lib] = splitTexts;
+    } catch (error) {
+      console.error("Error processing library", lib, error);
+      results[lib] = [`Error fetching documentation: ${error.message}`];
     }
-    if (!candidateURL) {
-      results[lib] = "No documentation found.";
-      continue;
-    }
-    // Step 2: Use Gemini API to verify and select the best URL
-    const geminiPrompt = {
-      "model": "gemini-2.0-flash-exp",
-      "contents": `Given the following search results from SERPAPI for library "${lib}": ${JSON.stringify(serpapiData.organic_results.slice(0, 3))}. Select the most official and stable documentation URL. Only return the URL.`
-    };
-    let geminiURL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
-    let geminiResponse = await fetch(geminiURL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(geminiPrompt)
-    });
-    let geminiData = await geminiResponse.json();
-    let chosenURL = candidateURL; // default if Gemini fails
-    if (geminiData && geminiData.candidates && geminiData.candidates.length > 0) {
-      chosenURL = geminiData.candidates[0].output.trim();
-    }
-    // Step 3: Fetch the documentation page content (using a free CORS proxy)
-    const proxyURL = "https://api.allorigins.hexocode.repl.co/get?disableCache=true&url=" + encodeURIComponent(chosenURL);
-    let pageResponse = await fetch(proxyURL);
-    let pageData = await pageResponse.json();
-    let htmlContent = pageData.contents;
-    // Step 4: Convert HTML content to plain text, preserving headers and code blocks
-    let plainText = parseHTMLToPlainText(htmlContent);
-    // Step 5: Split text if it exceeds ~30k tokens (approximate by word count)
-    let splitTexts = splitText(plainText, 30000);
-    results[lib] = splitTexts;
   }
   displayResults(results, outputOption);
 }
@@ -128,7 +138,7 @@ function parseHTMLToPlainText(html) {
   const doc = parser.parseFromString(html, 'text/html');
   let output = "";
 
-  // Recursive function to process elements
+  // Recursive processing of elements
   function processElement(el) {
     let text = "";
     if (el.tagName && (el.tagName.match(/^H[1-6]$/) || el.tagName === "P")) {
@@ -184,7 +194,7 @@ function displayResults(results, outputOption) {
     link.textContent = "Download Consolidated Documentation";
     downloadLinksDiv.appendChild(link);
   } else {
-    // Create separate files for each library
+    // Create separate download links for each library
     for (let lib in results) {
       let libOutput = "Documentation for " + lib + ":\n\n";
       results[lib].forEach(chunk => {

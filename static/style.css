@@ -1,26 +1,68 @@
+/* Global Styles */
 body {
     font-family: Arial, sans-serif;
-    margin: 20px;
-  }
-  h1, h2 {
+    margin: 0;
+    padding: 0;
+    background-color: #f7f7f7; /* Pastel light gray background */
     color: #333;
   }
-  #upload-section, #dependencies-section, #result-section, #api-keys-section {
-    margin-bottom: 20px;
+  
+  /* Centered container with shadow and padding */
+  .container {
+    width: 90%;
+    max-width: 800px;
+    margin: 30px auto;
+    padding: 20px;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
-  input[type="text"], textarea {
+  
+  /* Headings */
+  h1, h2 {
+    text-align: center;
+    color: #555;
+  }
+  
+  /* Sections */
+  section {
+    margin-bottom: 20px;
+    padding: 10px;
+  }
+  
+  /* Form Elements */
+  input[type="file"],
+  input[type="text"],
+  textarea {
     width: 100%;
     padding: 8px;
-    margin: 5px 0;
+    margin: 8px 0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
   }
+  
   button {
     padding: 10px 15px;
     background-color: #4285F4;
     color: white;
     border: none;
+    border-radius: 4px;
     cursor: pointer;
+    margin-top: 10px;
   }
+  
   button:hover {
     background-color: #3367D6;
+  }
+  
+  /* Checkbox list */
+  .checkbox-item {
+    margin-bottom: 5px;
+  }
+  
+  .radio-group {
+    margin: 10px 0;
+    display: flex;
+    justify-content: space-around;
   }
   

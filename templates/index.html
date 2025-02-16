@@ -6,46 +6,50 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <h1>Dependency Documentation Fetcher</h1>
-  <div id="upload-section">
-    <h2>Upload Code Files</h2>
-    <form id="upload-form" enctype="multipart/form-data">
-      <input type="file" id="file-input" name="files[]" multiple accept=".py,.js,.json,.txt,.java,.c,.cpp,.ts,.go,.rb">
-      <button type="submit">Extract Dependencies</button>
-    </form>
-  </div>
+  <div class="container">
+    <h1>Dependency Documentation Fetcher</h1>
+    
+    <section id="upload-section">
+      <h2>Upload Code Files</h2>
+      <form id="upload-form" enctype="multipart/form-data">
+        <input type="file" id="file-input" name="files[]" multiple accept=".py,.js,.json,.txt,.java,.c,.cpp,.ts,.go,.rb">
+        <button type="submit">Extract Dependencies</button>
+      </form>
+    </section>
 
-  <div id="dependencies-section" style="display:none;">
-    <h2>Detected Libraries</h2>
-    <form id="libraries-form">
-      <div id="libraries-list"></div>
-      <label>
-        <input type="radio" name="output_option" value="consolidated" checked>
-        Consolidated Output
-      </label>
-      <label>
-        <input type="radio" name="output_option" value="separate">
-        Separate Files per Library
-      </label>
-      <button type="submit">Fetch Documentation</button>
-    </form>
-  </div>
+    <section id="dependencies-section" style="display:none;">
+      <h2>Detected Libraries</h2>
+      <form id="libraries-form">
+        <div id="libraries-list"></div>
+        <div class="radio-group">
+          <label>
+            <input type="radio" name="output_option" value="consolidated" checked>
+            Consolidated Output
+          </label>
+          <label>
+            <input type="radio" name="output_option" value="separate">
+            Separate Files per Library
+          </label>
+        </div>
+        <button type="submit">Fetch Documentation</button>
+      </form>
+    </section>
 
-  <div id="result-section" style="display:none;">
-    <h2>Documentation Output</h2>
-    <div id="download-links"></div>
-    <textarea id="output-text" rows="20" cols="100"></textarea>
-  </div>
+    <section id="result-section" style="display:none;">
+      <h2>Documentation Output</h2>
+      <div id="download-links"></div>
+      <textarea id="output-text" rows="20" cols="100"></textarea>
+    </section>
 
-  <div id="api-keys-section">
-    <h2>API Keys</h2>
-    <label for="serpapi-key">SERPAPI API Key:</label>
-    <input type="text" id="serpapi-key" placeholder="Enter SERPAPI API Key">
-    <br>
-    <label for="gemini-key">Gemini API Key:</label>
-    <input type="text" id="gemini-key" placeholder="Enter Gemini API Key">
+    <section id="api-keys-section">
+      <h2>API Keys</h2>
+      <label for="serpapi-key">SERPAPI API Key:</label>
+      <input type="text" id="serpapi-key" placeholder="Enter SERPAPI API Key">
+      <br>
+      <label for="gemini-key">Gemini API Key:</label>
+      <input type="text" id="gemini-key" placeholder="Enter Gemini API Key">
+    </section>
   </div>
-
   <script src="{{ url_for('static', filename='main.js') }}"></script>
 </body>
 </html>
