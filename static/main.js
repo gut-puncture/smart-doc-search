@@ -1,4 +1,4 @@
-// File upload and dependency extraction remains the same
+// File upload and dependency extraction remains unchanged
 document.getElementById('upload-form').addEventListener('submit', function(e) {
   e.preventDefault();
   const files = document.getElementById('file-input').files;
@@ -51,7 +51,7 @@ function displayLibraries(libraries) {
   section.style.display = 'block';
 }
 
-// Now, documentation fetching is handled by the Flask endpoint /fetch_docs
+// Documentation fetching now uses the Flask backend endpoint /fetch_docs
 document.getElementById('libraries-form').addEventListener('submit', function(e) {
   e.preventDefault();
   const selectedLibraries = [];
@@ -85,9 +85,7 @@ async function fetchDocumentation(libraries, serpapiKey, geminiKey, outputOption
     console.log("Sending payload to /fetch_docs:", payload);
     const response = await fetch('/fetch_docs', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     const results = await response.json();

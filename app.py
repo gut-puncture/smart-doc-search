@@ -18,9 +18,7 @@ def allowed_file(filename):
 def extract_dependencies_from_code(content, filename):
     dependencies = set()
     ext = filename.rsplit('.', 1)[1].lower()
-
     if ext == 'py':
-        # Robust Python extraction: imports and pip install commands
         pattern_import = r'^\s*import\s+([\w\.]+(?:\s*,\s*[\w\.]+)*)'
         pattern_from = r'^\s*from\s+([\w\.]+)\s+import'
         matches_import = re.findall(pattern_import, content, re.MULTILINE)
@@ -38,7 +36,6 @@ def extract_dependencies_from_code(content, filename):
         matches_pip = re.findall(pattern_pip, content)
         dependencies.update(matches_pip)
     elif ext in ['js', 'ts']:
-        # Robust JavaScript/TypeScript extraction: require/import/dynamic import and npm install commands
         pattern_require = r'require\(\s*[\'"]([^\'"]+)[\'"]\s*\)'
         pattern_import = r'import\s+(?:[\w\{\}\*\s,]+)\s+from\s+[\'"]([^\'"]+)[\'"]'
         pattern_dynamic = r'import\(\s*[\'"]([^\'"]+)[\'"]\s*\)'
@@ -52,7 +49,6 @@ def extract_dependencies_from_code(content, filename):
         matches_npm = re.findall(pattern_npm, content)
         dependencies.update(matches_npm)
     elif ext == 'rb':
-        # Ruby: require and gem install commands
         pattern_rb = r'require\s+[\'"]([^\'"]+)[\'"]'
         matches_rb = re.findall(pattern_rb, content)
         dependencies.update(matches_rb)
@@ -60,7 +56,6 @@ def extract_dependencies_from_code(content, filename):
         matches_gem = re.findall(pattern_gem, content)
         dependencies.update(matches_gem)
     elif ext == 'go':
-        # Go: handle single and grouped import statements
         pattern_go_single = r'import\s+[\'"]([^\'"]+)[\'"]'
         pattern_go_group = r'import\s*\(\s*([^)]*)\)'
         matches_go_single = re.findall(pattern_go_single, content)
@@ -72,17 +67,14 @@ def extract_dependencies_from_code(content, filename):
                 if line:
                     dependencies.add(line)
     elif ext == 'java':
-        # Java: capture import statements and return the base package as dependency
         pattern_java = r'import\s+([\w\.]+);'
         matches_java = re.findall(pattern_java, content)
         for match in matches_java:
             dependencies.add(match.split('.')[0])
     else:
-        # For any other text-based file, use a generic pattern
         pattern_generic = r'(?:pip|npm|gem)\s+install\s+([\w\-]+)'
         matches_generic = re.findall(pattern_generic, content)
         dependencies.update(matches_generic)
-    # Additional generic extraction: catch any "install <package>" patterns
     pattern_generic2 = r'install\s+([\w\-]+)'
     matches_generic2 = re.findall(pattern_generic2, content)
     dependencies.update(matches_generic2)
@@ -106,7 +98,6 @@ def upload_files():
             except Exception as e:
                 app.logger.error(f"Error reading {filename}: {e}")
                 continue
-            # Special handling for package manager files:
             if filename == 'package.json':
                 try:
                     pkg = json.loads(content)
@@ -182,15 +173,38 @@ def fetch_docs():
             if not organic_results:
                 results[lib] = ["No documentation found via SERPAPI."]
                 continue
-            gemini_prompt = {
-                "model": "gemini-2.0-flash-exp",
-                "contents": f"Given the following SERPAPI results for library \"{lib}\": {organic_results}. Select the most official and stable documentation URL. Only return the URL."
+
+            # Take the top 3 results and include additional info (position, title, link)
+            filtered_results = []
+            for res in organic_results[:3]:
+                filtered_results.append({
+                    "position": res.get("position"),
+                    "title": res.get("title"),
+                    "link": res.get("link")
+                })
+            results_json = json.dumps(filtered_results)
+            gemini_payload = {
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [
+                            {
+                                "text": (
+                                    f"Given the following SERPAPI results for library \"{lib}\": {results_json}. "
+                                    "Select the most official and stable documentation URL. Only return the URL. Always return a URL."
+                                )
+                            }
+                        ]
+                    }
+                ]
             }
-            gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={geminiKey}"
-            app.logger.info(f"Calling Gemini API for {lib} with payload: {gemini_prompt}")
-            gemini_resp = requests.post(gemini_url, json=gemini_prompt, headers={'Content-Type': 'application/json'})
+            gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={geminiKey}"
+            app.logger.info(f"Calling Gemini API for {lib} with payload: {gemini_payload}")
+            gemini_resp = requests.post(gemini_url, json=gemini_payload, headers={'Content-Type': 'application/json'})
             if gemini_resp.status_code != 200:
-                results[lib] = [f"Gemini API error: {gemini_resp.status_code}"]
+                error_body = gemini_resp.text
+                app.logger.error(f"Gemini API error for {lib}: {gemini_resp.status_code}. Response: {error_body}")
+                results[lib] = [f"Gemini API error: {gemini_resp.status_code}. Response: {error_body}"]
                 continue
             gemini_data = gemini_resp.json()
             candidates = gemini_data.get("candidates", [])
@@ -211,6 +225,7 @@ def fetch_docs():
             chunks = split_text(plain_text, 30000)
             results[lib] = chunks
         except Exception as e:
+            app.logger.error(f"Error processing library {lib}: {str(e)}")
             results[lib] = [f"Error processing library: {str(e)}"]
     return jsonify(results)
 
