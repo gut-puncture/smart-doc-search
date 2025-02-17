@@ -169,6 +169,7 @@ def fetch_docs():
                 results[lib] = [f"SERPAPI error: {serpapi_resp.status_code}"]
                 continue
             serpapi_data = serpapi_resp.json()
+            app.logger.info(f"SERPAPI data for {lib}:\n{json.dumps(serpapi_data, indent=2)}")
             organic_results = serpapi_data.get("organic_results", [])
             if not organic_results:
                 results[lib] = ["No documentation found via SERPAPI."]
@@ -191,13 +192,14 @@ def fetch_docs():
                             {
                                 "text": (
                                     f"Given the following SERPAPI results for library \"{lib}\": {results_json}. "
-                                    "Select the most official and stable documentation URL. Only return the URL. Always return a URL."
+                                    "Select the most official and stable documentation URL. Only return the URL. You must always return a URL or the program breaks."
                                 )
                             }
                         ]
                     }
                 ]
             }
+            app.logger.info(f"Gemini payload for {lib}:\n{json.dumps(gemini_payload, indent=2)}")
             gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={geminiKey}"
             app.logger.info(f"Calling Gemini API for {lib} with payload: {gemini_payload}")
             gemini_resp = requests.post(gemini_url, json=gemini_payload, headers={'Content-Type': 'application/json'})
@@ -207,10 +209,18 @@ def fetch_docs():
                 results[lib] = [f"Gemini API error: {gemini_resp.status_code}. Response: {error_body}"]
                 continue
             gemini_data = gemini_resp.json()
+            app.logger.info(f"Gemini response for {lib}:\n{json.dumps(gemini_data, indent=2)}")
             candidates = gemini_data.get("candidates", [])
             chosen_url = ""
             if candidates:
                 chosen_url = candidates[0].get("output", "").strip()
+            app.logger.info(f"Chosen URL from Gemini for {lib}: '{chosen_url}'")
+            if not chosen_url:
+            # Fallback to the first SERPAPI result's link
+                if filtered_results and filtered_results[0].get("link"):
+                    fallback_url = filtered_results[0]["link"]
+                    app.logger.warning(f"Gemini returned no valid URL for {lib}; falling back to SERPAPI link: {fallback_url}")
+                    chosen_url = fallback_url
             if not chosen_url:
                 results[lib] = ["No valid documentation URL returned by Gemini."]
                 continue
@@ -228,6 +238,39 @@ def fetch_docs():
             app.logger.error(f"Error processing library {lib}: {str(e)}")
             results[lib] = [f"Error processing library: {str(e)}"]
     return jsonify(results)
+
+#temporary debug endpoint
+@app.route('/debug_gemini', methods=['GET'])
+def debug_gemini():
+    lib = "flask"
+    test_results = [
+        {"position": 1, "title": "Welcome to Flask — Flask Documentation (3.1.x)", "link": "https://flask.palletsprojects.com/"},
+        {"position": 2, "title": "Flask Intro — Python Beginners documentation - Read the Docs", "link": "https://python-adv-web-apps.readthedocs.io/en/latest/flask.html"},
+        {"position": 3, "title": "Welcome to Flask — Flask 0.13.dev documentation", "link": "https://azcv.readthedocs.io/"}
+    ]
+    results_json = json.dumps(test_results)
+    gemini_payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [
+                    {
+                        "text": (
+                            f"Given the following SERPAPI results for library \"{lib}\": {results_json}. "
+                            "Select the most official and stable documentation URL. Only return the URL. Always return a URL."
+                        )
+                    }
+                ]
+            }
+        ]
+    }
+    app.logger.info(f"Debug Gemini payload for {lib}:\n{json.dumps(gemini_payload, indent=2)}")
+    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=YOUR_GEMINI_API_KEY"
+    headers = {'Content-Type': 'application/json'}
+    resp = requests.post(gemini_url, json=gemini_payload, headers=headers)
+    app.logger.info(f"Debug Gemini response for {lib}:\n{resp.text}")
+    return resp.text, resp.status_code
+
 
 if __name__ == '__main__':
     app.run(debug=True)
