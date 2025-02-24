@@ -2,7 +2,7 @@ import requests
 import json
 
 # Replace with your actual Gemini API key
-GEMINI_KEY = "AIzaSyDugnyJ2nzi4pQgqHxZq84H1OwyuHcNo8U"
+GEMINI_KEY = <key>
 # Example payload with a sample SERPAPI result for Flask documentation
 payload = {
     "contents": [
